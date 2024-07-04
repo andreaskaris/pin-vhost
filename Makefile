@@ -1,7 +1,11 @@
-.PHONY: build
-build:
-	go build -o _output/pin-vhost
+.PHONY: deps
+deps:
+	yum install -y libbpf-devel clang llvm
 
-.PHONY: build-vhost
-build-vhost:
-	gcc -o _output/create-vhost create-vhost.c
+.PHONY: generate
+generate:
+	go generate
+
+.PHONY: build
+build: generate
+	go build -buildvcs=false -o _output/pin-vhost
