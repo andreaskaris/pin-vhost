@@ -35,11 +35,12 @@ run-container-foreground: # run container in foreground
 
 .PHONY: run-container
 run-container: # run container in background
-	podman run --privileged -v /proc:/proc --pid=host --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)
+	podman run --privileged -v /proc:/proc --pid=host -d --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)
 
 .PHONY: stop-container
 stop-container: # stop container running in background
 	podman stop $(CONTAINER_NAME)
+	podman rm $(CONTAINER_NAME)
 
 # https://dwmkerr.com/makefile-help-command/
 .PHONY: help
