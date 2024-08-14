@@ -40,11 +40,31 @@ make stop-container
 
 I tested this on a RHEL 9 system with dpdk-testpmd.
 
-First, run the application, e.g.:
+Make sure that the system has hugepages:
+
+```
+# cat <<'EOF' > /etc/sysctl.d/80-hugepages.conf
+# Number of 2MB hugepages desired
+vm.nr_hugepages=1024
+EOF
+# reboot
+```
+
+After reboot:
+
+```
+# grep -iE 'HugePages_Free|Hugepagesize' /proc/meminfo
+HugePages_Free:     1024
+Hugepagesize:       2048 kB
+```
+
+Run the application, e.g.:
 
 ```
 # make run-container-foreground CONTAINER_IMAGE=quay.io/akaris/pin-vhost PIN_MODE=last
 ```
+> **Note:** If the vhost-net module has not been loaded before, run: `modprobe vhost-net`. dpdk-testpmd will autoload it,
+so you can also run that one first.
 
 Then, run testpmd:
 
