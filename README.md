@@ -64,7 +64,8 @@ Run the application, e.g.:
 # make run-container-foreground CONTAINER_IMAGE=quay.io/akaris/pin-vhost PIN_MODE=last
 ```
 > **Note:** If the vhost-net module has not been loaded before, run: `modprobe vhost-net`. dpdk-testpmd will autoload it,
-so you can also run that one first.
+so you could also run that one first. However, for a valid test case where you want to start the pin-vhost first, and
+dpdk-testpmd second.
 
 Then, run testpmd:
 
