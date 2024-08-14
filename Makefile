@@ -2,10 +2,6 @@
 deps:
 	yum install -y libbpf-devel clang llvm
 
-.PHONY: vendor
-vendor:
-	go mod vendor
-
 .PHONY: generate
 generate:
 	go generate
