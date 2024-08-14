@@ -43,7 +43,7 @@ I tested this on a RHEL 9 system with dpdk-testpmd.
 First, run the application, e.g.:
 
 ```
-make run-container-foreground CONTAINER_IMAGE=quay.io/akaris/pin-vhost PIN_MODE=last
+# make run-container-foreground CONTAINER_IMAGE=quay.io/akaris/pin-vhost PIN_MODE=last
 ```
 
 Then, run testpmd:
