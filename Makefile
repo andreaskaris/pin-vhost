@@ -1,5 +1,6 @@
 CONTAINER_IMAGE_LOCAL ?= localhost/pin-vhost
-CONTAINER_IMAGE_REMOTE ?= quay.io/akaris/pin-vhost 
+CONTAINER_IMAGE_REMOTE ?= quay.io/akaris/pin-vhost
+CONTAINER_IMAGE ?= $(CONTAINER_IMAGE_LOCAL) 
 CONTAINER_NAME ?= pin-vhost
 PIN_MODE ?= first
 
@@ -21,20 +22,20 @@ container-image: # build container image
 
 .PHONY: push-container-image
 push-container-image: # push container image to remote registry
-	podman tag -t $(CONTAINER_IMAGE_REMOTE) $(CONTAINER_IMAGE_LOCAL)
+	podman tag $(CONTAINER_IMAGE_LOCAL) $(CONTAINER_IMAGE_REMOTE)
 	podman push $(CONTAINER_IMAGE_REMOTE)
 
 .PHONY: run-container-foreground-discovery-mode
 run-container-foreground-discovery-mode: # run container in foreground in discovery mode (no pinning)
-	podman run --privileged -v /proc:/proc --pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE_LOCAL) pin-vhost -discovery-mode
+	podman run --privileged -v /proc:/proc --pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -discovery-mode
 
 .PHONY: run-container-foreground
 run-container-foreground: # run container in foreground
-	podman run --privileged -v /proc:/proc --pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE_LOCAL) pin-vhost -pin-mode $(PIN_MODE)
+	podman run --privileged -v /proc:/proc --pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)
 
 .PHONY: run-container
 run-container: # run container in background
-	podman run --privileged -v /proc:/proc --pid=host --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE_LOCAL) pin-vhost -pin-mode $(PIN_MODE)
+	podman run --privileged -v /proc:/proc --pid=host --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)
 
 .PHONY: stop-container
 stop-container: # stop container running in background

@@ -94,6 +94,10 @@ func main() {
 		rd.Close()
 	}()
 
+	// Reconcile at startup for vhost threads that are already there.
+	scanProc(discoveryMode, pinMode)
+
+	// Reconcile whenever a new vhost thread is started.
 	for {
 		record, err := rd.Read()
 		if err != nil {
