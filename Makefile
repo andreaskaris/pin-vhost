@@ -12,6 +12,10 @@ deps: # install dependencies
 generate: # generate the cilium libraries
 	go generate
 
+.PHONY: generate-vmlinux-h
+generate-vmlinux-h: # generate vmlinux.h (should not be necessary)
+	bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+
 .PHONY: build
 build: generate # build binary
 	go build -buildvcs=false -o _output/pin-vhost
@@ -41,6 +45,17 @@ run-container: # run container in background
 stop-container: # stop container running in background
 	podman stop $(CONTAINER_NAME)
 	podman rm $(CONTAINER_NAME)
+
+.PHONY: deploy-daemonset
+deploy-daemonset: # deploy the daemonset on kubernetes
+	oc new-project pin-vhost || oc project pin-vhost
+	oc adm policy add-scc-to-user privileged -z default || true
+	kubectl apply -f config/daemonset.yaml
+
+.PHONY: undeploy-daemonset
+undeploy-daemonset:
+	oc project default
+	oc delete project pin-vhost
 
 # https://dwmkerr.com/makefile-help-command/
 .PHONY: help

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: pin-vhost
+  labels:
+    k8s-app: pin-vhost
+spec:
+  selector:
+    matchLabels:
+      name: pin-vhost
+  template:
+    metadata:
+      labels:
+        name: pin-vhost
+    spec:
+      tolerations:
+      - operator: Exists
+      hostPID: true
+      hostNetwork: true
+      containers:
+      - name: pin-vhost
+        securityContext:
+          privileged: true
+          # capabilities:
+          #  add: #["NET_ADMIN"]
+          #    - ALL
+        image: quay.io/akaris/pin-vhost:latest
+        # imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
+        command:
+        - pin-vhost
+        - "-pin-mode"
+        - "first" 
+        volumeMounts:
+        - name: host
+          mountPath: /host
+      volumes:
+      - name: host
+        hostPath:
+          path: /
