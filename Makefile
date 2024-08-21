@@ -31,15 +31,18 @@ push-container-image: # push container image to remote registry
 
 .PHONY: run-container-foreground-discovery-mode
 run-container-foreground-discovery-mode: # run container in foreground in discovery mode (no pinning)
-	podman run --privileged -v /proc:/proc --pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -discovery-mode
+	podman run --privileged -v /proc:/host/proc -v /sys:/host/sys \
+	--pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -discovery-mode -log-level 5
 
 .PHONY: run-container-foreground
 run-container-foreground: # run container in foreground
-	podman run --privileged -v /proc:/proc --pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)
+	podman run --privileged -v /proc:/host/proc -v /sys:/host/sys \
+	--pid=host --rm --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)  -log-level 5
 
 .PHONY: run-container
 run-container: # run container in background
-	podman run --privileged -v /proc:/proc --pid=host -d --name $(CONTAINER_NAME) -it $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)
+	podman run --privileged -v /proc:/host/proc -v /sys:/host/sys \
+	--pid=host -d --name $(CONTAINER_NAME) $(CONTAINER_IMAGE) pin-vhost -pin-mode $(PIN_MODE)  -log-level 5
 
 .PHONY: stop-container
 stop-container: # stop container running in background

@@ -101,3 +101,33 @@ And you can verify with taskset:
 ```
 # taskset -c -p $(ps aux | pgrep vhost-)
 ```
+
+## Deploying on OpenShift
+
+You can deploy the DaemonSet in its own namespace with:
+
+```
+make deploy-daemonset
+```
+
+You can remove the DaemonSet and all related resources with:
+
+```
+make undeploy-daemonset
+```
+
+You can check logs with:
+
+```
+$ oc logs -n pin-vhost -l name=pin-vhost
+I0821 18:25:18.297248  707069 main.go:96]  == Reconciling on startup. Scanning directory /host/proc for vhost processes.
+I0821 18:25:18.323208  707069 process.go:179] Pinning pid 706887. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+I0821 18:25:18.323252  707069 process.go:179] Pinning pid 706888. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+I0821 18:25:18.323280  707069 process.go:179] Pinning pid 706889. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+I0821 18:25:18.323307  707069 process.go:179] Pinning pid 706890. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+I0821 18:25:18.327496  707069 main.go:102]  == Listening for vhost kthread creation.
+I0821 18:26:36.704901  707069 process.go:179] Pinning pid 709298. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+I0821 18:26:36.705299  707069 process.go:179] Pinning pid 709299. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+I0821 18:26:36.705823  707069 process.go:179] Pinning pid 709300. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+I0821 18:26:36.706329  707069 process.go:179] Pinning pid 709301. Configured pin-mode: "first". Currrent cpus_allowed_list: "28,30,32,34,36,38,40,42,84,86,88,90,92,94,96,98". New CPU set: "28"
+```

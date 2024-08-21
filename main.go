@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
+	"path"
 	"syscall"
 
 	"github.com/andreaskaris/pin-vhost/pkg/process"
@@ -15,21 +15,36 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
+	"k8s.io/klog/v2"
 )
 
 var (
 	pinMode       = flag.String("pin-mode", "", "instruction for vCPU to pin to (accepted values: 'first', 'last', [0-9]+,)")
 	discoveryMode = flag.Bool("discovery-mode", false, "discovery mode will print all discovered processes that match proc-name-filter")
+	logLevel      = flag.String("log-level", "0", "print higher klog-levels")
 )
+
+// getHostDirectory checks if /host/<dirname> exists, in that case we'll return that one, otherwise return just <dirname>
+// (important for containerization).
+func getHostDirectory(dirname string) string {
+	hostDirname := path.Join("/host", dirname)
+	if _, err := os.Stat(hostDirname); err == nil {
+		dirname = hostDirname
+	}
+	return dirname
+}
 
 func main() {
 	// Parse provided parameters.
 	flag.Parse()
 
+	var level klog.Level
+	level.Set(*logLevel)
+
 	// Create new process instance (also validates that combination of discoveryMode and pinMode is valid).
-	p, err := process.New(*discoveryMode, *pinMode, "^vhost-.*")
+	p, err := process.New(*discoveryMode, *pinMode, "^vhost-.*", getHostDirectory("/proc"))
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	// Subscribe to signals for terminating the program.
@@ -38,32 +53,35 @@ func main() {
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	// Load pre-compiled programs and maps into the kernel.
 	objs := kthreadCreateOnNodeObjects{}
-	if err := loadKthreadCreateOnNodeObjects(&objs, nil); err != nil {
-		log.Fatalf("loading objects: %v", err)
+	// With map pinning (needs change in kthread_create_on_node.c as well):
+	//collectionOpts := &ebpf.CollectionOptions{Maps: ebpf.MapOptions{PinPath: getHostDirectory("/sys/fs/bpf/")}}
+	// Without map pinning:
+	collectionOpts := &ebpf.CollectionOptions{}
+	if err := loadKthreadCreateOnNodeObjects(&objs, collectionOpts); err != nil {
+		klog.Fatalf("loading objects: %v", err)
 	}
 	defer objs.Close()
 
-	// Attach the pre-compiled program at fexit.. Each time the kernel function enters, the program
-	// will increment the execution counter by 1. The read loop below polls this
-	// map value once per second.
-	//linkInstance, err := link.Kretprobe(kprobeFn, objs.KthreadCreateOnNode, nil)
+	// Attach the pre-compiled program at fexit.
 	linkInstance, err := link.AttachTracing(link.TracingOptions{
 		Program:    objs.KthreadCreateOnNode,
 		AttachType: ebpf.AttachTraceFExit,
 	})
 	if err != nil {
-		log.Fatalf("attaching eBPF tracing: %s", err)
+		klog.Fatalf("attaching eBPF tracing: %s", err)
 	}
 	defer linkInstance.Close()
 
+	// Create a reader for the map. The reader's rd.Read() will block until a new perf event is added to the map, see
+	// below.
 	rd, err := perf.NewReader(objs.KthreadCreateOnNodeMap, os.Getpagesize())
 	if err != nil {
-		log.Fatalf("creating event reader: %s", err)
+		klog.Fatalf("creating event reader: %s", err)
 	}
 	defer rd.Close()
 
@@ -75,26 +93,32 @@ func main() {
 	}()
 
 	// Reconcile at startup for vhost threads that are already there.
-	log.Printf(" == Reconciling on startup. Scanning directory %s for vhost processes.", p.GetProcDirectory())
-	p.PinAll()
+	klog.Infof(" == Reconciling on startup. Scanning directory %s for vhost processes.", p.GetProcDirectory())
+	if err := p.PinAll(); err != nil {
+		klog.Fatal(err)
+	}
 
 	// Whenever a kthread starting with vhost- is started, pin the process.
-	log.Printf(" == Listening for vhost kthread creation.")
+	klog.Infof(" == Listening for vhost kthread creation.")
 	for {
 		record, err := rd.Read()
+		klog.V(5).Info("BPF program detected vhost thread creation")
 		if err != nil {
 			if errors.Is(err, perf.ErrClosed) {
-				log.Println("Received signal, exiting..")
+				klog.Info("Received signal, exiting..")
 				return
 			}
-			log.Printf("reading from reader: %s", err)
+			klog.Infof("reading from reader: %s", err)
 			continue
 		}
 		// Record returns the PID in LittleEndian. Parse it as uint32 and then pin the process.
 		// See kthread_create_on_node.c.
 		pid := binary.LittleEndian.Uint32(record.RawSample)
+		klog.V(5).Infof("Received notification about vhost thread with PID %d", pid)
 		go func() {
-			p.Pin(int(pid))
+			if err := p.Pin(int(pid)); err != nil {
+				klog.Warning(err)
+			}
 		}()
 	}
 }

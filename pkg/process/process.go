@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"regexp"
 	"strconv"
 
 	"golang.org/x/sys/unix"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/cpuset"
 )
 
@@ -40,7 +40,7 @@ type Instance struct {
 }
 
 // New returns a new process instance.
-func New(discoveryMode bool, pinMode, procNameFilterRegularExpression string) (*Instance, error) {
+func New(discoveryMode bool, pinMode, procNameFilterRegularExpression, procDirectory string) (*Instance, error) {
 	if !discoveryMode {
 		if err := validatePinMode(pinMode); err != nil {
 			return nil, fmt.Errorf("must provide a valid pin-mode when discovery mode is off, %q", err)
@@ -52,7 +52,7 @@ func New(discoveryMode bool, pinMode, procNameFilterRegularExpression string) (*
 	}
 
 	return &Instance{
-		procDirectory:       getProcDirectory(),
+		procDirectory:       procDirectory,
 		pinMode:             pinMode,
 		discoveryMode:       discoveryMode,
 		procNameFilterRegex: regexp.MustCompile(procNameFilterRegularExpression),
@@ -66,21 +66,22 @@ func (i *Instance) GetProcDirectory() string {
 
 // PinAll scans directory /proc or /host/proc for processes that match procNameFilterRegex. Matching processes are
 // pinned to pinMode, or their details are printed if in discovery mode.
-func (i *Instance) PinAll() {
+func (i *Instance) PinAll() error {
 	entries, err := os.ReadDir(i.procDirectory)
 	if err != nil {
-		log.Fatalf("Could not read from proc directory %q, err: %q", i.procDirectory, err)
+		return fmt.Errorf("could not read from proc directory %q, err: %q", i.procDirectory, err)
 	}
 	var pid int
 	for _, entry := range entries {
 		if entry.IsDir() {
 			if pid, err = strconv.Atoi(entry.Name()); err == nil {
 				if err := i.Pin(pid); err != nil {
-					log.Printf("Warning: %s", err)
+					klog.Infof("Warning: %s", err)
 				}
 			}
 		}
 	}
+	return nil
 }
 
 // Pin pins a process with pid. It retrieves the process name and CPUs allowed list from /proc/<pid>/status. Then, it
@@ -98,7 +99,7 @@ func (i *Instance) Pin(pid int) error {
 	}
 	// If this is discovery mode, only print the process attributes, but do not pin.
 	if i.discoveryMode {
-		log.Printf("PID: %d, Name: %s, cpus_allowed_list: %s\n", pid, procName, procCPUsAllowedList)
+		klog.Infof("PID: %d, Name: %s, cpus_allowed_list: %s\n", pid, procName, procCPUsAllowedList)
 		return nil
 	}
 	// If this is not discovery mode, pin the process.
@@ -141,17 +142,6 @@ func (i *Instance) getProcessAttributes(pid int) ([]byte, []byte, error) {
 
 /* Helpers */
 
-// getProcDirectory checks if /host/proc exists, in that case we'll be looking there for process information (important
-// for containerization).
-func getProcDirectory() string {
-	procDirectory := "/proc"
-	hostProc := path.Join("/host", procDirectory)
-	if _, err := os.Stat(hostProc); err == nil {
-		procDirectory = hostProc
-	}
-	return procDirectory
-}
-
 // validatePinMode returns true if the pin mode is supported.
 func validatePinMode(pinMode string) error {
 	if !pinModeRegex.MatchString(pinMode) {
@@ -186,7 +176,7 @@ func pinProcess(pid int, currentProcCPUsAllowedList []byte, pinMode string) erro
 	for _, cpu := range cpus.List() {
 		cpuMask.Set(cpu)
 	}
-	log.Printf("Pinning pid %d. Configured pin-mode: %q. Currrent cpus_allowed_list: %q. New CPU set: %q",
+	klog.V(2).Infof("Pinning pid %d. Configured pin-mode: %q. Currrent cpus_allowed_list: %q. New CPU set: %q",
 		pid, pinMode, currentProcCPUsAllowedList, newProcCPUsAllowedList)
 	return unix.SchedSetaffinity(pid, &cpuMask)
 }

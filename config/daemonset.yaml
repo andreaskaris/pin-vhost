@@ -16,7 +16,6 @@ spec:
       tolerations:
       - operator: Exists
       hostPID: true
-      hostNetwork: true
       containers:
       - name: pin-vhost
         securityContext:
@@ -29,12 +28,21 @@ spec:
         imagePullPolicy: Always
         command:
         - pin-vhost
+        - "-log-level"
+        - "2"
         - "-pin-mode"
         - "first" 
+        # - "-discovery-mode"
         volumeMounts:
-        - name: host
-          mountPath: /host
+        - name: hostproc
+          mountPath: /host/proc
+        # If we were pinning the map, we'd want to mount /host/sys, otherwise not:
+        # - name: hostsys
+        #   mountPath: /host/sys
       volumes:
-      - name: host
+      - name: hostproc
         hostPath:
-          path: /
+          path: /proc
+      # - name: hostsys
+      #  hostPath:
+      #    path: /sys
